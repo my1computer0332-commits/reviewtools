@@ -12,7 +12,7 @@ const ITEMS = [
   {
     question: "Why does a Google Maps link sometimes open the listing instead of the review form?",
     answer:
-      "Google's review form opens with a Place ID (starts with “ChIJ”). If your Maps URL contains a 0x…:0x… feature pair, the tool rebuilds the Place ID automatically and returns a one-tap link. A CID-only link uses a Google Search fallback that opens the reviews panel. If a link still lands on the listing, paste the full Maps URL from Share → Copy link, or paste the Place ID directly.",
+      "Google's review form opens with a Place ID (starts with “ChIJ”). If your Maps URL contains a 0x…:0x… feature pair, the tool rebuilds the Place ID automatically and returns a one-tap link. A CID-only link uses Google's local review endpoint with ludocid, which opens the same review dialog. Short maps.app.goo.gl links are expanded first. If a link still lands on the listing, paste the full Maps URL from the address bar, or paste the Place ID directly.",
   },
   {
     question: "Are the Facebook, Yelp, and Tripadvisor links direct review forms?",
@@ -30,9 +30,9 @@ const ITEMS = [
       "Yes. A review link cannot preselect a rating. Customers choose their own stars and write their own words, which is exactly what platform policies require.",
   },
   {
-    question: "Does the QR code expire?",
+    question: "Can I use the link on printed material?",
     answer:
-      "No. The QR code encodes the review URL directly, so it keeps working as long as the link does. Download the SVG for print work and the PNG for screens and documents.",
+      "Yes. The link can be printed on receipts, table cards, or packaging, and it works on any device. Short links are fine, but the full review link is the most reliable option in print.",
   },
 ];
 

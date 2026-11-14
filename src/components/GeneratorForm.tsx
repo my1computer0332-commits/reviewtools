@@ -16,6 +16,8 @@ interface Props {
   onRememberKeyChange: (value: boolean) => void;
   error: string | null;
   busy: boolean;
+  /** True while a shortened Google Maps link is being expanded. */
+  resolvingShortLink?: boolean;
   places: PlaceResult[];
   onChoosePlace: (place: PlaceResult) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -33,6 +35,7 @@ export function GeneratorForm({
   onRememberKeyChange,
   error,
   busy,
+  resolvingShortLink = false,
   places,
   onChoosePlace,
   onSubmit,
@@ -163,8 +166,9 @@ export function GeneratorForm({
               Copy the full URL from the address bar. It usually contains a 0x…:0x… feature pair.
             </li>
             <li>
-              If you used <strong>Share → Copy link</strong> and got a maps.app.goo.gl link, open it
-              once, then copy the full google.com/maps URL from the address bar.
+              A <strong>Share → Copy link</strong> short link (maps.app.goo.gl) is expanded
+              automatically. If Google blocks the lookup, open it once and paste the full
+              google.com/maps URL from the address bar.
             </li>
           </ol>
           <p className="hint">
@@ -227,7 +231,13 @@ export function GeneratorForm({
       ) : null}
 
       <button type="submit" className="btn btn-primary btn-wide" disabled={busy}>
-        {searchMode ? (busy ? "Searching…" : "Search places") : "Create review link"}
+        {resolvingShortLink
+          ? "Expanding short link…"
+          : searchMode
+            ? busy
+              ? "Searching…"
+              : "Search places"
+            : "Create review link"}
       </button>
     </form>
   );

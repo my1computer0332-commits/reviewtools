@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { PLATFORMS, generateLink, type GeneratedLink, type PlatformId } from "./platforms";
+import {
+  PLATFORMS,
+  generateLink,
+  isGoogleShortLink,
+  type GeneratedLink,
+  type ParseResult,
+  type PlatformId,
+} from "./platforms";
 import { searchPlaces, type PlaceResult } from "./lib/places";
+import { SHORT_LINK_ERROR, expandGoogleShortLink } from "./lib/shortlink";
 import {
   addHistory,
   readHistory,
@@ -75,6 +83,7 @@ export default function App() {
   const [result, setResult] = useState<GeneratedLink | null>(null);
   const [places, setPlaces] = useState<PlaceResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [resolving, setResolving] = useState(false);
   const [history, setHistory] = useState<StoredLink[]>(() => readHistory());
   const resultRef = useRef<HTMLDivElement>(null);
   const searchController = useRef<AbortController | null>(null);
@@ -102,7 +111,15 @@ export default function App() {
     requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
   }, []);
 
+  const cancelPending = () => {
+    searchController.current?.abort();
+    searchController.current = null;
+    setSearching(false);
+    setResolving(false);
+  };
+
   const handlePlatform = (id: PlatformId) => {
+    cancelPending();
     setPlatformId(id);
     setMode("link");
     setInput("");
@@ -113,6 +130,7 @@ export default function App() {
 
   const handleModeChange = (next: InputMode) => {
     if (next === mode) return;
+    cancelPending();
     setMode(next);
     setInput("");
     setError(null);
@@ -120,6 +138,7 @@ export default function App() {
   };
 
   const handleInputChange = (value: string) => {
+    if (resolving || searching) cancelPending();
     setInput(value);
     if (error) setError(null);
   };
@@ -157,18 +176,51 @@ export default function App() {
     }
   };
 
+  const applyOutcome = (outcome: ParseResult) => {
+    if (outcome.ok) commit(outcome.link);
+    else {
+      setError(outcome.error);
+      setResult(null);
+    }
+  };
+
+  /**
+   * Short Google Maps links hide the Place ID behind a redirect. Expand them
+   * first, then run the normal parser on the resolved URL.
+   */
+  const resolveShortLink = async () => {
+    searchController.current?.abort();
+    const controller = new AbortController();
+    searchController.current = controller;
+    setResolving(true);
+    setSearching(false);
+    setError(null);
+    setResult(null);
+    setPlaces([]);
+
+    try {
+      const expanded = await expandGoogleShortLink(input, controller.signal);
+      if (controller.signal.aborted) return;
+      applyOutcome(generateLink("google", expanded));
+    } catch (cause) {
+      if (controller.signal.aborted) return;
+      setError(cause instanceof Error ? cause.message : SHORT_LINK_ERROR);
+    } finally {
+      if (!controller.signal.aborted) setResolving(false);
+    }
+  };
+
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (mode === "search" && platform.supportsPlaceSearch) {
       void runSearch();
       return;
     }
-    const outcome = generateLink(platformId, input);
-    if (outcome.ok) commit(outcome.link);
-    else {
-      setError(outcome.error);
-      setResult(null);
+    if (platformId === "google" && isGoogleShortLink(input)) {
+      void resolveShortLink();
+      return;
     }
+    applyOutcome(generateLink(platformId, input));
   };
 
   const choosePlace = (place: PlaceResult) => {
@@ -243,9 +295,9 @@ export default function App() {
               </div>
               <h1>Free review link generator</h1>
               <p className="lede">
-                Paste a Google Maps link, Place ID, or CID and get a one-tap review link, a
-                print-ready QR code, and ready-to-send messages. Facebook, Yelp, Tripadvisor, and
-                Trustpilot are supported too.
+                Paste a Google Maps link, Place ID, or CID and get a one-tap link that opens the
+                “Write a review” dialog directly. Facebook, Yelp, Tripadvisor, and Trustpilot are
+                supported too.
               </p>
               <ul className="trust-pills">
                 <li>
@@ -273,7 +325,8 @@ export default function App() {
                 rememberKey={rememberKey}
                 onRememberKeyChange={setRememberKey}
                 error={error}
-                busy={searching}
+                busy={searching || resolving}
+                resolvingShortLink={resolving}
                 places={places}
                 onChoosePlace={choosePlace}
                 onSubmit={handleSubmit}
@@ -323,10 +376,10 @@ export default function App() {
             </li>
             <li>
               <span className="step-number">3.</span>
-              <h3>Copy, open, or scan</h3>
+              <h3>Copy and send</h3>
               <p>
-                Copy the one-tap link, open it to check, download a high-resolution QR code, or start
-                from a ready-to-send message.
+                Copy the one-tap link, open it to check, then send it by email, SMS, or WhatsApp, or
+                add it to your website.
               </p>
             </li>
           </ol>

@@ -73,9 +73,9 @@ export function buildTemplates(link: GeneratedLink): ShareTemplate[] {
     {
       id: "print",
       title: "Receipt or table card",
-      description: "Print the QR code with this short call to action.",
+      description: "Print this short call to action with the review link.",
       channel: "print",
-      body: ["HOW WAS YOUR VISIT?", "Scan the QR code to share your experience with us.", url].join("\n"),
+      body: ["HOW WAS YOUR VISIT?", "Leave us a quick review here:", url].join("\n"),
     },
     {
       id: "button",

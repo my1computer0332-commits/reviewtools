@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { PLATFORMS, type GeneratedLink } from "../platforms";
 import { copyText } from "../lib/clipboard";
-import { downloadDataUrl, downloadText, qrPngDataUrl, qrPreviewDataUrl, qrSvg } from "../lib/qr";
 
 interface Props {
   link: GeneratedLink;
@@ -23,25 +22,7 @@ export function ResultPanel({ link, onReset }: Props) {
     [link.platform],
   );
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
-  const [qr, setQr] = useState<string | null>(null);
-  const [qrError, setQrError] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setQr(null);
-    setQrError(false);
-    qrPreviewDataUrl(link.reviewUrl)
-      .then((value) => {
-        if (active) setQr(value);
-      })
-      .catch(() => {
-        if (active) setQrError(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, [link.reviewUrl]);
 
   useEffect(() => {
     if (!copiedKey) return;
@@ -87,18 +68,6 @@ export function ResultPanel({ link, onReset }: Props) {
       setCopiedKey(key);
     });
 
-  const downloadPng = () =>
-    void withAction(async () => {
-      const data = await qrPngDataUrl(link.reviewUrl, 2048);
-      downloadDataUrl(data, `review-link-${link.platform}.png`);
-    });
-
-  const downloadSvg = () =>
-    void withAction(async () => {
-      const svg = await qrSvg(link.reviewUrl);
-      downloadText(svg, `review-link-${link.platform}.svg`, "image/svg+xml");
-    });
-
   return (
     <section className="card result" aria-live="polite">
       <div className="result-head">
@@ -141,10 +110,10 @@ export function ResultPanel({ link, onReset }: Props) {
           className="btn btn-primary"
           onClick={() => copyValue("link", link.reviewUrl)}
         >
-          {copiedKey === "link" ? "Copied" : "Copy"}
+          {copiedKey === "link" ? "Copied" : "Copy link"}
         </button>
         <a className="btn btn-secondary" href={link.reviewUrl} target="_blank" rel="noreferrer">
-          Open
+          {link.direct ? "Open review form" : "Open reviews"}
         </a>
       </div>
 
@@ -183,37 +152,10 @@ export function ResultPanel({ link, onReset }: Props) {
         </p>
       ) : null}
 
-      <div className="result-grid">
-        <div className="qr-card">
-          <p className="eyebrow">QR code</p>
-          {qr ? (
-            <img src={qr} alt={`QR code for the ${platform.name} review link`} width={220} height={220} />
-          ) : (
-            <div className="qr-placeholder" aria-hidden="true" />
-          )}
-          <div className="qr-actions">
-            <button type="button" className="btn btn-secondary" onClick={downloadPng} disabled={!qr}>
-              Download PNG
-            </button>
-            <button type="button" className="btn btn-ghost" onClick={downloadSvg} disabled={!qr}>
-              Download SVG
-            </button>
-          </div>
-          <p className="qr-meta">2048 × 2048 PNG · scalable SVG · print-ready</p>
-          {qrError ? <p className="error">The QR code could not be generated.</p> : null}
-        </div>
-
-        <div className="result-actions">
-          <p className="eyebrow">Use it anywhere</p>
-          <ul className="plain-list">
-            <li>Print it on receipts, table cards, or packaging.</li>
-            <li>Add it to emails, SMS, or WhatsApp messages.</li>
-            <li>Link it from your website or social profiles.</li>
-          </ul>
-          <button type="button" className="btn btn-secondary btn-wide" onClick={onReset}>
-            Try another business
-          </button>
-        </div>
+      <div className="result-foot">
+        <button type="button" className="btn btn-secondary" onClick={onReset}>
+          Try another business
+        </button>
       </div>
     </section>
   );

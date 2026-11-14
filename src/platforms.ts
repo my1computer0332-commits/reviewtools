@@ -24,7 +24,7 @@ export const PLATFORMS: readonly PlatformDefinition[] = [
     linkKind: "Direct review link",
     inputLabel: "Google Maps link, Place ID, or CID",
     placeholder: "https://www.google.com/maps/place/… or ChIJ…",
-    help: "Paste the full link from your business's Google Maps page (open short maps.app.goo.gl links first), a Place ID (starts with ChIJ), or a CID. Full Maps links and CIDs are converted into a one-tap review link.",
+    help: "Paste the link from your business's Google Maps page, a short maps.app.goo.gl link, a Place ID (starts with ChIJ), or a CID. Each one is converted into a one-tap link that opens the review dialog.",
     example:
       "https://www.google.com/maps/place/San+Francisco+International+Airport/@37.6213,-122.3790,17z/data=!4m3!3m2!1s0x808f778c55555555:0xa4f25c571acded3f",
     supportsPlaceSearch: true,
@@ -114,12 +114,22 @@ const GOOGLE_PLACE_ID_PREFIX = /place_id:([\w-]{8,})/i;
 const GOOGLE_PLACE_ID = /\b(ChIJ[\w-]{8,})/;
 const GOOGLE_CID = /[?&](?:cid|ludocid)=(\d{6,})/i;
 /** Full feature ID pair (0x…:0x…) from a Maps data block or an ftid/fid parameter. */
-const GOOGLE_FTID = /(?:!1s|ftid=|fid=|business_id=)(0x[0-9a-f]+:0x[0-9a-f]+)/i;
+const GOOGLE_FTID = /(?:!1s|ftid=|fid=|business_id=)(0x[0-9a-f]{1,16}:0x[0-9a-f]{1,16})/i;
 const GOOGLE_FTID_VALUE = /^0x[0-9a-f]{1,16}:0x[0-9a-f]{1,16}$/i;
 const GOOGLE_BARE_CID = /^\d{6,}$/;
 const GOOGLE_HOST = /(^|\.)google\.[a-z.]+$/i;
-const GOOGLE_SHORT_HOST = /^(?:maps\.app\.goo\.gl|goo\.gl)$/i;
+const GOOGLE_SHORT_HOST = /^(?:maps\.app\.goo\.gl|goo\.gl|g\.co)$/i;
 const G_PAGE_REVIEW = /^\/r\/[^/]+\/review\/?$/i;
+
+/** True when the input is a shortened Google Maps URL that needs expanding first. */
+export function isGoogleShortLink(input: string): boolean {
+  const url = withScheme(input);
+  if (!url) return false;
+  if (url.hostname.toLowerCase() === "g.co") {
+    return /^\/(?:kgs|maps)\//i.test(url.pathname);
+  }
+  return GOOGLE_SHORT_HOST.test(url.hostname);
+}
 
 const FACEBOOK_HOST = /(^|\.)facebook\.com$/i;
 const FACEBOOK_RESERVED = new Set([
@@ -192,13 +202,12 @@ export function reviewUrlForFeatureId(featureId: string): string {
 }
 
 /**
- * Fallback review link for a CID-only input. Google Search accepts a
- * `ludocid` plus an `#lrd=0x0:0x<cid>,3` fragment, which opens the review tab.
+ * Direct review-dialog link for a CID-only input. Google's local review
+ * endpoint accepts `ludocid` and opens the same "Write a review" pop-up as
+ * the Place ID flow, on both desktop and mobile.
  */
-export function reviewUrlForCid(cid: string, businessName?: string): string {
-  const hex = BigInt(cid).toString(16);
-  const query = encodeURIComponent(businessName?.trim() || cid);
-  return `https://www.google.com/search?q=${query}&ludocid=${cid}#lrd=0x0:0x${hex},3`;
+export function reviewUrlForCid(cid: string): string {
+  return `https://search.google.com/local/writereview?ludocid=${encodeURIComponent(cid)}`;
 }
 
 function writeUint64LE(bytes: Uint8Array, offset: number, value: bigint): void {
@@ -308,11 +317,10 @@ function cidLink(cid: string, businessName?: string): ParseResult {
     ok: true,
     link: {
       platform: "google",
-      reviewUrl: reviewUrlForCid(cid, businessName),
+      reviewUrl: reviewUrlForCid(cid),
       businessName,
       cid,
       direct: true,
-      note: "Built from the CID. If the review form does not open, paste the full Maps URL that contains the 0x…:0x… pair.",
     },
   };
 }
@@ -357,9 +365,9 @@ function parseGoogle(input: string): ParseResult {
     return fail("That does not look like a Google Maps link or Place ID. Paste the full URL, or switch to name search.");
   }
 
-  if (GOOGLE_SHORT_HOST.test(url.hostname)) {
+  if (isGoogleShortLink(raw)) {
     return fail(
-      "Short Google Maps links have to be opened first. Open the link, then copy the full google.com/maps URL from the address bar.",
+      "This short Google Maps link could not be expanded. Open it once, then paste the full google.com/maps URL from the address bar.",
     );
   }
 
@@ -375,9 +383,11 @@ function parseGoogle(input: string): ParseResult {
   }
 
   if (url.pathname.includes("/local/writereview")) {
-    const placeId = url.searchParams.get("placeid");
+    const placeId = url.searchParams.get("placeid") ?? url.searchParams.get("place_id");
     if (placeId) return placeIdLink(placeId);
-    return fail("That review link is missing its placeid. Copy the complete link and try again.");
+    const ludocid = url.searchParams.get("ludocid") ?? url.searchParams.get("cid");
+    if (ludocid && GOOGLE_BARE_CID.test(ludocid)) return cidLink(ludocid);
+    return fail("That review link is missing its placeid or ludocid. Copy the complete link and try again.");
   }
 
   const name = googlePlaceName(url);
@@ -579,15 +589,21 @@ export function generateLink(platform: PlatformId, input: string): ParseResult {
 export function inspectInput(platform: PlatformId, input: string): InputFeedback | null {
   if (!input.trim()) return null;
 
+  if (platform === "google" && isGoogleShortLink(input)) {
+    return {
+      tone: "warn",
+      message: "Short Google Maps link detected — it will be expanded automatically when you create the link.",
+    };
+  }
+
   const outcome = generateLink(platform, input);
   if (!outcome.ok) return { tone: "error", message: outcome.error };
 
   const link = outcome.link;
   if (link.cid && !link.placeId && !link.featureId) {
     return {
-      tone: "warn",
-      message:
-        "CID found — using a Google Search fallback. Paste the full Maps URL with its 0x…:0x… pair for a guaranteed one-tap link.",
+      tone: "ok",
+      message: "CID found — opens the review dialog directly.",
       link,
     };
   }

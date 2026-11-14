@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   generateLink,
   inspectInput,
+  isGoogleShortLink,
   placeIdFromFeatureId,
   reviewUrlForCid,
   reviewUrlForFeatureId,
@@ -119,13 +120,29 @@ describe("Google review links", () => {
     expect(link.reviewUrl).toBe(reviewUrlForPlaceId("ChIJN1t_tDeuEmsRUsoyG83frY4"));
   });
 
-  it("uses the place name in a CID review link", () => {
+  it("keeps the place name when building a CID review link", () => {
     const link = linkFor(
       "google",
       "https://www.google.com/maps/place/Massage+Envy/@33.6,-112.1,17z?cid=12682026813239828050",
     );
-    expect(link.reviewUrl).toBe(reviewUrlForCid("12682026813239828050", "Massage Envy"));
+    expect(link.reviewUrl).toBe(reviewUrlForCid("12682026813239828050"));
     expect(link.businessName).toBe("Massage Envy");
+  });
+
+  it("reads a ludocid from a writereview link", () => {
+    const link = linkFor(
+      "google",
+      "https://search.google.com/local/writereview?ludocid=12682026813239828050",
+    );
+    expect(link.cid).toBe("12682026813239828050");
+    expect(link.reviewUrl).toBe(reviewUrlForCid("12682026813239828050"));
+    expect(link.direct).toBe(true);
+  });
+
+  it("reads a CID from a write_review action link", () => {
+    const link = linkFor("google", "https://maps.google.com/maps?cid=11256099&action=write_review");
+    expect(link.cid).toBe("11256099");
+    expect(link.reviewUrl).toBe("https://search.google.com/local/writereview?ludocid=11256099");
   });
 
   it("passes through a g.page review link", () => {
@@ -151,9 +168,9 @@ describe("Google review links", () => {
     expect(feedback?.link?.placeId).toBe("ChIJq3uGrhyPsUcRoqE7daOz-LY");
   });
 
-  it("warns about the CID fallback in live feedback", () => {
+  it("reports a CID as a direct link in live feedback", () => {
     const feedback = inspectInput("google", "https://www.google.com/maps?cid=11256099");
-    expect(feedback?.tone).toBe("warn");
+    expect(feedback?.tone).toBe("ok");
     expect(feedback?.message).toContain("CID found");
     expect(feedback?.link?.cid).toBe("11256099");
   });
@@ -164,8 +181,22 @@ describe("Google review links", () => {
     expect(feedback?.message).toContain("not a Google link");
   });
 
-  it("explains how to resolve a short Maps link", () => {
-    expect(errorFor("google", "https://maps.app.goo.gl/abc123")).toContain("Short Google Maps links");
+  it("detects short Maps links so they can be expanded first", () => {
+    expect(isGoogleShortLink("https://maps.app.goo.gl/abc123")).toBe(true);
+    expect(isGoogleShortLink("https://goo.gl/maps/abc123")).toBe(true);
+    expect(isGoogleShortLink("https://g.co/kgs/abc123")).toBe(true);
+    expect(isGoogleShortLink("https://www.google.com/maps/place/Example")).toBe(false);
+    expect(isGoogleShortLink("ChIJN1t_tDeuEmsRUsoyG83frY4")).toBe(false);
+  });
+
+  it("marks a short link as pending instead of erroring while typing", () => {
+    const feedback = inspectInput("google", "https://maps.app.goo.gl/abc123");
+    expect(feedback?.tone).toBe("warn");
+    expect(feedback?.message).toContain("expanded automatically");
+  });
+
+  it("explains the fallback when a short link cannot be expanded", () => {
+    expect(errorFor("google", "https://maps.app.goo.gl/abc123")).toContain("could not be expanded");
   });
 
   it("rejects non-Google links", () => {

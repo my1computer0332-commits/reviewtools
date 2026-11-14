@@ -1006,86 +1006,16 @@ summary:focus-visible {
   font-size: 0.8rem;
 }
 
-.result-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 240px) minmax(0, 1fr);
-  gap: 1rem;
+.result-foot {
+  display: flex;
+  justify-content: flex-end;
   margin-top: 1.2rem;
 }
 
-.qr-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.1rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--line-soft);
-  background: var(--surface-2);
-  text-align: center;
-}
-
-.qr-card img {
-  width: 200px;
-  height: 200px;
-  padding: 0.5rem;
-  border-radius: var(--radius-sm);
-  background: #fff;
-  border: 1px solid var(--line-soft);
-}
-
-.qr-placeholder {
-  width: 200px;
-  height: 200px;
-  border-radius: var(--radius-sm);
-  background: color-mix(in oklab, var(--line) 60%, transparent);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-.qr-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 0.5rem;
-}
-
-.qr-actions .btn {
+.result-foot .btn {
   height: 2.5rem;
-  padding: 0 0.85rem;
-  font-size: 0.8rem;
-}
-
-.qr-meta {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.result-actions {
-  display: flex;
-  flex-direction: column;
-  padding: 0.4rem 0.2rem;
-}
-
-.plain-list {
-  margin: 0.65rem 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-}
-
-.plain-list li {
-  position: relative;
-  padding-left: 1.35rem;
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.plain-list li::before {
-  content: "✓";
-  position: absolute;
-  left: 0;
-  color: var(--success);
-  font-weight: 700;
+  padding: 0 0.95rem;
+  font-size: 0.82rem;
 }
 
 /* Share templates */
@@ -1404,12 +1334,6 @@ summary:focus-visible {
   }
 }
 
-@keyframes pulse {
-  50% {
-    opacity: 0.45;
-  }
-}
-
 @keyframes star-pop {
   0% {
     opacity: 0;
@@ -1445,10 +1369,6 @@ summary:focus-visible {
 @media (max-width: 900px) {
   .platform-picker {
     grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .result-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 
   .template-grid {
@@ -1514,10 +1434,12 @@ summary:focus-visible {
     padding: 0 0.8rem;
   }
 
-  .qr-card img,
-  .qr-placeholder {
-    width: 180px;
-    height: 180px;
+  .result-foot {
+    justify-content: stretch;
+  }
+
+  .result-foot .btn {
+    width: 100%;
   }
 }
 

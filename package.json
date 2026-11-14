@@ -3,7 +3,7 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Create share-ready review links and QR codes for Google, Facebook, Yelp, Tripadvisor, and Trustpilot.",
+  "description": "Create direct review links for Google, Facebook, Yelp, Tripadvisor, and Trustpilot.",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
